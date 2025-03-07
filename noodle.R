@@ -104,8 +104,10 @@ pie(table(data$wage), main = "Pie Chart of Wages", col = rainbow(length(unique(d
 
     data <- read.csv("https://kinhteluong.online/esdata/wage/wage9.csv");formula <- log(wage) ~ log(age) + log(schooling) + tenure + gender + origin + science + social; model <- lm(formula, data = data);specific_tests <- list(c("rural=0", "ocities=0"), c("gender=0", "family=0")); predictor_formula <- as.formula(paste("~", deparse(formula[[3]])));lmtest::bptest(model, predictor_formula, data = data);round(robust <- lmtest::coeftest(model, vcov = sandwich::vcovHC(model, type = "HC0")),3);car::linearHypothesis(model, paste(names(coef(model))[-1], "= 0"), white.adjust = "hc1");for (test_set in specific_tests) {print(car::linearHypothesis(model, test_set, white.adjust = "hc1"))}
       
-      cat("\n\tExact Effects Log_LogLin\n");round((1.01^coef(robust)[grepl("log", names(coef(robust)))] - 1) * 100, 3);round((exp(coef(robust)[!grepl("log", names(coef(robust))) & names(coef(robust)) != "(Intercept)"]) - 1) * 100, 3)
+    cat("\n\tExact Effects Log_LogLin\n");round((1.01^coef(robust)[grepl("log", names(coef(robust)))] - 1) * 100, 3);round((exp(coef(robust)[!grepl("log", names(coef(robust))) & names(coef(robust)) != "(Intercept)"]) - 1) * 100, 3)
     
     cat("\n\tExact Effects LinLog\n"); print(round(coef(model)[grepl('log', names(coef(model)))] * log(1.01), 3)); print(round(coef(model)[!grepl('log', names(coef(model))) & names(coef(model)) != '(Intercept)'], 3))
     
+    data <- read.csv("https://kinhteluong.online/esdata/iu/panel.csv")
+    psych::describe(data, fast = T)
     
