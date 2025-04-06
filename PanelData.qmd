@@ -1,0 +1,117 @@
+---
+title: "Pane Data"
+format: html
+editor: visual
+---
+
+## Panel Data
+
+```{r}
+data=read.csv("https://kinhteluong.online/esdata/iu/panel.csv")
+```
+
+## Xem xét cân bằng của Panel Data
+
+```{r}
+table(data$province)
+```
+
+Nếu có dữ liệu không cân bằng, R chỉ chạy những dữ liệu đủ
+
+# Lib
+
+```{r}
+    library(plm)
+    library(sandwich)
+    library(lmtest)
+    library(clubSandwich)
+```
+
+# Hausman Test
+
+```{r}
+
+    data <- read.csv("https://kinhteluong.online/esdata/drug/drug9.csv");model_formula <- log(drugusers) ~ landprice + log(unempl) + log(pcgdp) + urbanize + countryborder + selfempl + industry;panel_index <- c("commune","year");re <- plm(model_formula, data = data, index = panel_index, model = "random");fe <- plm(model_formula, data = data, index = panel_index, model = "within"); phtest(fe,re)
+  
+```
+
+```{r}
+    data <- read.csv("https://kinhteluong.online/esdata/sperform/sperform3.csv");model_formula <- log(GPA) ~ log(socialtime) + studytime + log(attendance) + work + library + campus + offcampus;panel_index <- c("student","year");re <- plm(model_formula, data = data, index = panel_index, model = "random");fe <- plm(model_formula, data = data, index = panel_index, model = "within"); phtest(fe,re)
+```
+
+```{r}
+    data <- read.csv("https://kinhteluong.online/esdata/hprice/hprice4.csv");model_formula <- log(hprice) ~ log(pcgdp) + log(interest) + unempl + policy + project + selfempl + industry;panel_index <- c("city","year");re <- plm(model_formula, data = data, index = panel_index, model = "random");fe <- plm(model_formula, data = data, index = panel_index, model = "within"); phtest(fe,re)
+```
+
+# PLM
+
+```{r}
+data <- read.csv("https://kinhteluong.online/esdata/hprice/hprice4.csv");    model_formula <- log(hprice) ~ pcgdp + interest + unempl + policy + project + selfempl + industry;panel_index <- c("city","year"); model <- plm(model_formula, data = data, index = panel_index, model = "within"); summary(model)
+
+#Exact Effects
+
+    cat("\n\tExact Effects Log_LogLin\n");round((1.01^model$coefficients[grepl("log", names(model$coefficients))] - 1) * 100, 3);round((exp(model$coefficients[!grepl("log", names(model$coefficients)) & names(model$coefficients) != "(Intercept)"]) - 1) * 100, 3)
+    
+    cat("\n\tExact Effects LinLog\n"); print(round(model$coefficients[grepl('log', names(model$coefficients))] * log(1.01), 3)); print(round(model$coefficients[!grepl('log', names(model$coefficients)) & names(model$coefficients) != '(Intercept)'], 3))
+```
+
+# Clustered
+
+```{r}
+    data <- read.csv("https://kinhteluong.online/esdata/hprice/hprice7.csv");    model_formula <- log(hprice) ~ log(pcgdp) + log(interest) + log(unempl) + policy + project + selfempl + industry;panel_index <- c("city","year"); model <- plm(model_formula, data = data, index = panel_index, model = "within"); print(model <- coef_test(model, vcov = "CR2", cluster = data$city))
+    
+    data <- read.csv("https://kinhteluong.online/esdata/hprice/hprice4.csv");    model_formula <- hprice ~ log(pcgdp) + log(interest) + unempl + policy + project + selfempl + industry;panel_index <- c("city","year"); model <- plm(model_formula, data = data, index = panel_index, model = "random"); print(model <- coef_test(model, vcov = "CR2", cluster = data$city))
+    
+  
+#Exact Effects
+    
+    cat("\n\tExact Effects LinLog COEF_TEST\n"); print(cbind(model[grepl('log', model$Coef) & model$p_Satt <= 0.1, "Coef"], round(model[grepl('log', model$Coef) & model$p_Satt <= 0.1, "beta"] * log(1.01), 3)), quote = F); print(cbind(format(model[!grepl('log', model$Coef) & model$Coef != '(Intercept)' & model$p_Satt <= 0.1, "Coef"], justify = "left"), round(model[!grepl('log', model$Coef) & model$Coef != '(Intercept)' & model$p_Satt <= 0.1, "beta"], 3)), quote = F)
+    
+    cat("\n\tExact Effects LogLog COEF_TEST\n"); print(cbind(model[grepl('log', model$Coef) & model$p_Satt <= 0.1, "Coef"], round((1.01^model[grepl('log', model$Coef) & model$p_Satt <= 0.1, "beta"] - 1) * 100, 3)), quote = F); print(cbind(format(model[!grepl('log', model$Coef) & model$Coef != '(Intercept)' & model$p_Satt <= 0.1, "Coef"], justify = "left"), round((exp(model[!grepl('log', model$Coef) & model$Coef != '(Intercept)' & model$p_Satt <= 0.1, "beta"]) - 1) * 100, 3)), quote = F)
+```
+
+# Robust
+
+```{r}
+    data <- read.csv("https://kinhteluong.online/esdata/hprice/hprice1.csv");model_formula <- hprice ~ log(pcgdp) + log(interest) + log(unempl) + policy + project + selfempl + industry;panel_index <- c("city","year");re <- plm(model_formula, data = data, index = panel_index, model = "random"); round(coeftest(re, vcov. = vcovHC, type = "HC1"),3)
+
+```
+
+## BT9: Hồi quy dữ liệu bảng (FEM và REM)
+
+```{r}
+##Model1
+
+data <- read.csv("https://kinhteluong.online/esdata/hprice/hprice18.csv");    model_formula <- hprice ~ pcgdp + interest + unempl + policy + project + selfempl + industry;panel_index <- c("city","year"); model <- plm(model_formula, data = data, index = panel_index, model = "random"); summary(model)
+
+re <- plm(model_formula, data = data, index = panel_index, model = "random");fe <- plm(model_formula, data = data, index = panel_index, model = "within"); phtest(fe,re)
+
+clusterSE <- coef_test(model, vcov = "CR2", cluster = data$city);print(clusterSE)
+
+round(coeftest(model, vcov. = vcovHC, type = "HC1"),3)
+```
+
+```{r}
+#Model2
+#PLM
+data <- read.csv("https://kinhteluong.online/esdata/hprice/hprice18.csv");    model_formula <- log(hprice) ~ pcgdp + log(interest) + log(unempl) + policy + project + selfempl + industry;panel_index <- c("city","year"); model <- plm(model_formula, data = data, index = panel_index, model = "within"); summary(model)
+
+cat("\n\tPLM Exact Effects Log_LogLin\n");round((1.01^model$coefficients[grepl("log", names(model$coefficients))] - 1) * 100, 3);round((exp(model$coefficients[!grepl("log", names(model$coefficients)) & names(model$coefficients) != "(Intercept)"]) - 1) * 100, 3)
+
+#Hausman test
+re <- plm(model_formula, data = data, index = panel_index, model = "random");fe <- plm(model_formula, data = data, index = panel_index, model = "within"); phtest(fe,re)
+
+#Cluster SE
+clusterSE <- coef_test(model, vcov = "CR2", cluster = data$city)
+print(clusterSE)
+
+
+cat("\n\tCLUSTER-SE Exact Effects LogLog\n"); print(cbind(clusterSE[grepl('log', clusterSE$Coef) & clusterSE$p_Satt <= 0.1, "Coef"], round((1.01^clusterSE[grepl('log', clusterSE$Coef) & clusterSE$p_Satt <= 0.1, "beta"] - 1) * 100, 3)), quote = F); print(cbind(format(clusterSE[!grepl('log', clusterSE$Coef) & clusterSE$Coef != '(Intercept)' & clusterSE$p_Satt <= 0.1, "Coef"], justify = "left"), round((exp(clusterSE[!grepl('log', clusterSE$Coef) & clusterSE$Coef != '(Intercept)' & clusterSE$p_Satt <= 0.1, "beta"]) - 1) * 100, 3)), quote = F)
+
+#RobustSE
+#print(robustSE <- coef_test(model, vcov = "CR0"))
+round(robustSE <- coeftest(model, vcov. = vcovHC, type = "HC1"),3)
+
+#cat("\n\tROBUST-SE Exact Effects LogLog\n"); print(cbind(robustSE[grepl('log', robustSE$Coef) & robustSE$p_Satt <= 0.1, "Coef"], round((1.01^robustSE[grepl('log', robustSE$Coef) & robustSE$p_Satt <= 0.1, "beta"] - 1) * 100, 3)), quote = F); print(cbind(format(robustSE[!grepl('log', robustSE$Coef) & robustSE$Coef != '(Intercept)' & robustSE$p_Satt <= 0.1, "Coef"], justify = "left"), round((exp(robustSE[!grepl('log', robustSE$Coef) & robustSE$Coef != '(Intercept)' & robustSE$p_Satt <= 0.1, "beta"]) - 1) * 100, 3)), quote = F)
+
+```

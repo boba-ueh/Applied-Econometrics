@@ -1,0 +1,309 @@
+---
+title: "B2-304"
+format: html
+editor: visual
+---
+
+# Binary dependent variable
+
+```{r}
+data = read.csv("EMP4.csv")
+
+psych::describe(data, fast = T)
+
+table(data$dself)
+table(data$male)
+table(data$edu)
+table(data$risk)
+
+summary(lpm <- lm(dself ~ efficacy80 + duration3 + priceUS+ pbenefit + hhincomeUS + hhsize + age + male + risk, data = data)) 
+```
+
+dself \~ b0 + b1\*ebfficacy80 + b2\*duration3 + b3\*priceUS+ b4\*hhincomeUS + b5\*hhsize + + b6\*age + b7\*male + b8\*neither + b9\*unlikely + b10\*verylikely + b11\*verylikely + b12\*pbenefit + u
+
+```{r}
+eq = function(price){ 
+  coef(lpm)["(Intercept)"] + coef(lpm)["priceUS"]*price + 
+  coef(lpm)["efficacy80"]*mean(data$efficacy80) +
+  coef(lpm)["duration3"]*mean(data$duration3) + 
+  coef(lpm)["priceUS"]*mean(data$priceUS) + 
+  coef(lpm)["pbenefit"]*mean(data$pbenefit) + 
+  coef(lpm)["hhincomeUS"]*mean(data$hhincomeUS) + 
+  coef(lpm)["hhsize"]*mean(data$hhsize) + 
+  coef(lpm)["age"]*mean(data$age) + 
+  coef(lpm)["male"]*mean(data$male) 
+} 
+
+plot(eq(1:150), type='l', ylab = "LMP predicted probability", xlab = "Price of Vaccine")
+```
+
+## Problem of LPM summary
+
+```{r}
+lpm <- lm(dself ~ efficacy80 + duration3 + priceUS+ pbenefit + hhincomeUS + hhsize + age + male, data = data)) 
+
+point2 <- data.frame(efficacy80=1, duration3=1, pbenefit=0,priceUS=150,hhincomeUS=500, hhsize=5, age=70,male=1)
+
+predict(lpm, newdata = point2, type="response")
+```
+
+# LOGIT
+
+```{r}
+summary(logit <- glm(dself ~ efficacy80 + duration3 + priceUS+ pbenefit + hhincomeUS + hhsize + age + male + risk, data = data, family=binomial(link="logit")))
+```
+
+GLM generalized linear model `Number of Fisher Scoring iterations: 5` chạy 5 vòng để đạt maxium Log likelihood `AIC: 376.22`
+
+## HYPOTHESISTESTING ###Solution 1
+
+```{r}
+null=glm(dself ~ 1,data=data,family=binomial(link="logit"))
+anova(null, logit, test="Chisq")
+```
+
+`anova` analysys of variance `Chisq` chi square
+
+**Conclusion**: at least one var. among the indep. vars. has significant effect on Pr(dself=1)
+
+### Solution2
+
+```{r}
+lmtest::lrtest(logit,c("risk"))
+```
+
+H0: beta1=beta2=0 2(LL(F)-LL(R))
+
+### Likelihood ratio test for 2 regessors
+
+```{r}
+lmtest::lrtest(logit,c("hhincomeUS","priceUS"))
+```
+
+Conclusion: at least one var. in the two var of `hhincomeUS` `priceUS` has sig. eff on Pr(dself=1)
+
+### Wald Test 1
+
+```{r}
+lmtest::waldtest(logit,c("risk"),test="Chisq")
+```
+
+### Wald Test 2
+
+```{r}
+aod::wald.test(b=coef(logit), Sigma = vcov(logit), Term = 10:13)
+```
+
+## MARGINAL EFFECTS
+
+#### Partial Effects for average observation
+
+```{r}
+library(mfx)
+logit_mfx <- logitmfx(dself ~ efficacy80 + duration3 + priceUS+ pbenefit + hhincomeUS + hhsize + age + male + risk, data = data, atmean = T )
+print(logit_mfx)
+```
+
+Marginal Effects: `atmean = T` M.E for average observations d.Pself1/d.age = beta(age)*(1/(1+e...)) -beta.age*avg.age-eff*avg.eff*
+
+*`priceUS           -4.7433e-03  1.3472e-03 -3.5209 0.0004302 ***`: giá cùa 2 liều vx tăng 1 đv, xx tiêm vc giảm -4.7433e-03*100 **percentage point**
+
+#### Average partial effects
+
+```{r}
+logit_mfx <- logitmfx(dself ~ efficacy80 + duration3 + priceUS+ pbenefit + hhincomeUS + hhsize + age + male + risk, data = data, atmean = F )
+print(logit_mfx)
+```
+
+`atmean = F` -beta.age*avg.age-beta.eff*eff
+
+#### Prediction
+
+```{r}
+ptable <- table(predict(logit, type="response") > 0.5, data$dself)
+#Rate of correct prediction
+sum(diag(ptable)/sum(ptable))
+```
+
+Tỉ lệ xác suất dự báo đúng `0.806366`
+
+## Predicted probability
+
+```{r}
+atspec = data.frame(efficacy80=1, duration3 = 1, pbenefit = 0, priceUS=seq(0,150,1), hhincomeUS=700, hhsize=4, age=30, male=1, risk="Very likely")
+plogit_spec = predict(logit, newdata=atspec, type="response")
+price = seq(0,150,1)
+par(mar=c(4,4,1,1))
+plot(price, plogit_spec, xlab="Price of vaccine(US$)", ylab = "Predicted probability")
+```
+
+`priceUS=seq(0,150,1)` bước nhảy 1 đô, giá từ 0 đến 150 `type="response")` binary response model `par(mar=c(4,4,1,1))` lề trên, dưới, trái, phải `plot(price, plogit_spec, xlab="Price of vaccine(US$)", ylab = "Predicted probability")` x=price, y=plogit_spec, gắn nhãn cho mỗi trục
+
+Giải thích: giá 0, xác xuát tiêm là \~100%
+
+# PROBIT
+
+## Probit model
+
+```{r}
+probit = glm(dself ~ efficacy80 + duration3 + priceUS+ pbenefit + hhincomeUS + hhsize + age + male + risk, data = data, family=binomial(link="probit"))
+summary(probit)
+```
+
+Ước lượng xs: xác định miền dao động của xs, phần dưới line
+
+-   CDF
+
+-   PDF
+
+```{r}
+lmtest::lrtest(probit, c("risk"))
+probit_mfx <- probitmfx(dself ~ efficacy80 + duration3 + priceUS+ pbenefit + hhincomeUS + hhsize + age + male + risk, data = data, atmean = T )
+```
+
+```{r}
+library(stargazer)
+stargazer(logit, probit, title="Regess Result", type="text", df=FALSE,digits=4, single.row = T)
+require(lattice)
+xyplot(pprobit_spec + plogit_spec ~ price, type = c('1','1'),color = c("blue","red"),auto.key=T,xlab="Price of vaccine",ylab="Predicted prob")
+```
+
+Constant
+
+beta (P-value)
+
+# Practice
+
+## Practice 1
+
+```{r}
+data <- read.csv("https://kinhteluong.online/esdata/ev/ev8.csv")
+data <- na.omit(data)
+
+summary(model <- glm(evehicle ~ income + schooling + distance + techno + frequency + veryconcern + someconcern, data = data, family=binomial(link="logit")))
+
+lmtest::lrtest(model,c("income","distance"))
+lmtest::lrtest(model,c("veryconcern","someconcern"))
+lmtest::lrtest(model,c("techno","frequency"))
+
+null=glm(evehicle ~ 1,data=data,family=binomial(link="logit"))
+anova(null,model,test="Chisq")
+
+```
+
+## Practice 2
+
+```{r}
+summary(model <- glm(evehicle ~ income + schooling + distance + techno + frequency + veryconcern + someconcern, data = read.csv("https://kinhteluong.online/esdata/ev/ev2.csv"), family=binomial(link="logit")))
+
+lmtest::waldtest(model,c("income","distance"),test="Chisq")
+lmtest::waldtest(model,c("veryconcern","someconcern"),test="Chisq")
+lmtest::waldtest(model,c("techno","frequency"),test="Chisq")
+
+```
+
+## Practice 3
+
+```{r}
+
+
+data <- read.csv("https://kinhteluong.online/esdata/housing/housing5.csv")
+#data <- na.omit(data)
+
+summary(model <- glm(htype ~ age + familysize + income + lifestyle + homebusiness + professional + freelancer, data =data, family=binomial(link="probit")))
+
+lmtest::waldtest(model,c("professional","freelancer"),test="Chisq")
+lmtest::waldtest(model,c("lifestyle","homebusiness"),test="Chisq")
+lmtest::waldtest(model,c("income","age"),test="Chisq")
+
+null=glm(htype ~ 1,data=data,family=binomial(link="probit"))
+lmtest::waldtest(model, null, test = "Chisq")
+```
+
+## Practice 4
+
+```{r}
+summary(model <- glm(htype ~ age + familysize + income + lifestyle + homebusiness + professional + freelancer, data = read.csv("https://kinhteluong.online/esdata/housing/housing3.csv"), family=binomial(link="probit")))
+
+
+```
+
+```         
+Warning: glm.fit: fitted probabilities numerically 0 or 1 occurred 
+```
+
+```{r}
+summary(model <- glm(evehicle ~ income + schooling + distance + techno + frequency + veryconcern + someconcern, data = read.csv("https://kinhteluong.online/esdata/ev/ev8.csv"), family=binomial(link="probit")))
+
+predicted_probs <- predict(model, type = "response")
+summary(predicted_probs) # Check the range of predicted probabilities
+
+extreme_probs <- predicted_probs[predicted_probs < 0.01 | predicted_probs > 0.99]
+extreme_probs
+
+extreme_data <- data[predicted_probs < 0.01 | predicted_probs > 0.99, ]
+head(extreme_data) # Check the corresponding observations
+
+plot(predicted_probs, main = "Predicted Probabilities", xlab = "Observation Index", ylab = "Predicted Probability")
+abline(h = 0.01, col = "red", lty = 2)
+abline(h = 0.99, col = "red", lty = 2)
+```
+
+```{r}
+summary(model <- glm(htype ~ age + familysize + income + lifestyle + homebusiness + professional + freelancer, data = read.csv("https://kinhteluong.online/esdata/housing/housing7.csv"), family=binomial(link="logit")))
+```
+
+## Practice 6
+
+```{r}
+data = read.csv("https://kinhteluong.online/esdata/housing/housing2.csv")
+print(marginal_effect <- mfx::probitmfx(htype ~ age + familysize + income + lifestyle + homebusiness + professional + freelancer, data = data, atmean = T ))
+```
+
+```{r}
+data = read.csv("https://kinhteluong.online/esdata/housing/housing3.csv")
+print(marginal_effect <- mfx::logitmfx(htype ~ age + familysize + income + lifestyle + homebusiness + professional + freelancer, data = data, atmean = T ))
+```
+
+```{r}
+data = read.csv("https://kinhteluong.online/esdata/ev/ev4.csv")
+print(marginal_effect <- mfx::probitmfx(evehicle ~ income + schooling + distance + techno + frequency + veryconcern + someconcern, data = data, atmean = F ))
+```
+
+## Bai tap 10
+
+```{r}
+data = read.csv("https://kinhteluong.online/esdata/ev/ev72.csv")
+formula <- evehicle ~ income + schooling + distance + techno + frequency + veryconcern + someconcern
+  
+summary(model <- glm(formula, data = data, family=binomial(link="probit")))
+
+lmtest::waldtest(model,c("income","distance"),test="Chisq")
+lmtest::waldtest(model,c("veryconcern","someconcern"),test="Chisq")
+lmtest::waldtest(model,c("techno","frequency"),test="Chisq")
+lmtest::waldtest(model, update(model, . ~ 1), test = "Chisq")
+
+lmtest::lrtest(model,c("income","distance"))
+lmtest::lrtest(model,c("veryconcern","someconcern"))
+lmtest::lrtest(model,c("techno","frequency"))
+
+print(mfx::probitmfx(formula, data = data, atmean = T ))
+print(mfx::probitmfx(formula, data = data, atmean = F ))
+```
+
+```{r}
+data = read.csv("https://kinhteluong.online/esdata/ev/ev72.csv")
+formula <- evehicle ~ income + schooling + distance + techno + frequency + veryconcern + someconcern
+  
+summary(model <- glm(formula, data = data, family=binomial(link="logit")))
+
+
+lmtest::waldtest(model,c("veryconcern","someconcern"),test="Chisq")
+lmtest::waldtest(model, update(model, . ~ 1), test = "Chisq")
+
+null=glm(evehicle ~ 1,data=data,family=binomial(link="logit"))
+anova(null,model,test="Chisq")
+
+print(mfx::logitmfx(formula, data = data, atmean = T ))
+print(mfx::logitmfx(formula, data = data, atmean = F ))
+```
